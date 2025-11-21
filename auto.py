@@ -1,5 +1,6 @@
 import os
 import sys
+import csv
 import logging
 import pymysql
 from dotenv import load_dotenv
@@ -65,15 +66,14 @@ def check_db_connection():
         logger.error(f"資料庫連線失敗: {e}")
         return False
 
-def fetch_data():
+def fetch_data(table_name):
     conn = pymysql.connect(**source_config)
     try:
         with conn.cursor() as cursor:
-            # 範例：抓取資料 (請替換為實際的 SQL)
-            # 這裡使用 SELECT 1, 100 作為測試，避免 transform_data 出錯
-            cursor.execute("SELECT 1, 100")
+            cursor.execute(f"SELECT * FROM alatech.{table_name} LIMIT 10;")
+            columns = [desc[0] for desc in cursor.description]
             results = cursor.fetchall()
-            return results
+            return columns, results
     finally:
         conn.close()
 
@@ -96,15 +96,39 @@ def insert_data(rows):
     finally:
         conn.close()
 
+def save_to_csv(columns, data, filename="output.csv"):
+    """將資料寫入 CSV 檔案"""
+    try:
+        # 使用 utf-8-sig 編碼以支援 Excel 開啟中文
+        with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.writer(f)
+            writer.writerow(columns)
+            writer.writerows(data)
+        logger.info(f"資料已成功寫入 {filename}")
+    except Exception as e:
+        logger.error(f"寫入 CSV 失敗: {e}")
+
 if __name__ == "__main__":
     if check_db_connection():
-        try:
-            data = fetch_data()
-            if data:
-                #transformed_data = transform_data(data)
-                #insert_data(transformed_data)
-                logger.info("資料轉換並插入完成！")
-        except Exception as e:
-            logger.error(f"執行失敗: {e}")
+        # 定義要匯出的資料表清單
+        table_names = [
+            "activity_day",
+            # "other_table_name", # 在此添加更多資料表
+        ]
+        
+        # 確保 csv 目錄存在
+        dirs = "output"
+        os.makedirs(f"./{dirs}", exist_ok=True)
+
+        for table_name in table_names:
+            try:
+                logger.info(f"正在處理資料表: {table_name}")
+                columns, data = fetch_data(table_name)
+                if data:
+                    save_to_csv(columns, data, f"./{dirs}/{table_name}.csv")
+                else:
+                    logger.warning(f"資料表 {table_name} 無資料")
+            except Exception as e:
+                logger.error(f"處理資料表 {table_name} 時發生錯誤: {e}")
     else:
         logger.error("無法連線至資料庫，程式終止。")

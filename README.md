@@ -13,4 +13,6 @@
 [.python-version](.python-version)
 目前是 3.9
 
+## DDL
+CREATE TABLE 的 SQL 語法
 
