@@ -85,14 +85,23 @@ def transform_data(rows):
         transformed.append((row[0], new_value))
     return transformed
 
-def insert_data(rows):
+def insert_data(table_name, columns, rows):
     conn = pymysql.connect(**target_config)
     try:
         with conn.cursor() as cursor:
-            # 假設目標表 my_table 結構與來源相同
-            insert_sql = "INSERT INTO my_table (id, value) VALUES (%s, %s)"
+            # 動態產生 INSERT SQL 指令
+            # 格式: INSERT INTO table_name (col1, col2, ...) VALUES (%s, %s, ...)
+            # 使用 backticks (`) 包裹欄位名稱以避免關鍵字衝突
+            cols_str = ", ".join([f"`{col}`" for col in columns])
+            placeholders = ", ".join(["%s"] * len(columns))
+            insert_sql = f"INSERT INTO `{table_name}` ({cols_str}) VALUES ({placeholders})"
+            
+            # 執行批次寫入
             cursor.executemany(insert_sql, rows)
         conn.commit()
+        logger.info(f"成功寫入 {len(rows)} 筆資料至目標資料庫的 {table_name} 資料表")
+    except Exception as e:
+        logger.error(f"寫入資料庫失敗: {e}")
     finally:
         conn.close()
 
@@ -126,6 +135,9 @@ if __name__ == "__main__":
                 columns, data = fetch_data(table_name)
                 if data:
                     save_to_csv(columns, data, f"./{dirs}/{table_name}.csv")
+                    
+                    # 同步寫入目標資料庫
+                    insert_data(f"{table_name}_backup", columns, data)
                 else:
                     logger.warning(f"資料表 {table_name} 無資料")
             except Exception as e:
