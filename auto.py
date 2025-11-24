@@ -4,9 +4,34 @@ import csv
 import logging
 import pymysql
 from dotenv import load_dotenv
+from datetime import datetime, timedelta, date as datetime_date
+
 
 # 載入 .env 檔案
+
+
 load_dotenv()
+
+
+def get_custom_week_number(date):
+    # 找到該年的第一個星期日
+    first_day_of_year = datetime_date(date.year, 1, 1)
+    # 計算第一個星期日是哪一天
+    days_to_first_sunday = (6 - first_day_of_year.weekday()) % 7  # weekday: 0=Mon, 6=Sun
+    first_sunday = first_day_of_year + timedelta(days=days_to_first_sunday)
+    
+    # 計算從第一個星期日到當前日期的天數
+    days_since_first_sunday = (date - first_sunday).days
+    
+    # 週數 = 天數 // 7 + 1
+    if days_since_first_sunday >= 0:
+        week_num = (days_since_first_sunday // 7) + 1
+    else:
+        # 如果日期在第一個星期日前，使用上一年的週數（這裡簡化，實際可能需要調整）
+        week_num = 52  # 或計算上一年
+    
+    return week_num
+
 
 # 設定日誌格式
 class CustomFormatter(logging.Formatter):
@@ -29,10 +54,15 @@ class CustomFormatter(logging.Formatter):
         return formatter.format(record)
 
 logger = logging.getLogger()
+
 logger.setLevel(logging.INFO)
+
 handler = logging.StreamHandler(sys.stdout)
+
 handler.setFormatter(CustomFormatter())
+
 logger.addHandler(handler)
+
 
 # 來源資料庫連線資訊
 source_config = {
@@ -43,6 +73,9 @@ source_config = {
     'charset': 'utf8mb4'
 }
 
+source_user_id = os.getenv('SOURCE_DB_USER_ID')
+
+
 # 目標資料庫連線資訊
 target_config = {
     'host': os.getenv('TARGET_DB_HOST'),
@@ -51,6 +84,9 @@ target_config = {
     'database': os.getenv('TARGET_DB_NAME'),
     'charset': 'utf8mb4'
 }
+
+target_user_id = os.getenv('TARGET_DB_USER_ID')
+
 
 def check_db_connection():
     """檢查資料庫連線"""
@@ -66,16 +102,19 @@ def check_db_connection():
         logger.error(f"資料庫連線失敗: {e}")
         return False
 
-def fetch_data(table_name):
+
+
+def fetch_data(select_sql):
     conn = pymysql.connect(**source_config)
     try:
         with conn.cursor() as cursor:
-            cursor.execute(f"SELECT * FROM alatech.{table_name} LIMIT 10;")
+            cursor.execute(select_sql)
             columns = [desc[0] for desc in cursor.description]
             results = cursor.fetchall()
             return columns, results
     finally:
         conn.close()
+
 
 def transform_data(rows):
     transformed = []
@@ -84,6 +123,7 @@ def transform_data(rows):
         new_value = row[1] + 1
         transformed.append((row[0], new_value))
     return transformed
+
 
 def insert_data(table_name, columns, rows):
     conn = pymysql.connect(**target_config)
@@ -95,7 +135,6 @@ def insert_data(table_name, columns, rows):
             cols_str = ", ".join([f"`{col}`" for col in columns])
             placeholders = ", ".join(["%s"] * len(columns))
             insert_sql = f"INSERT INTO `{table_name}` ({cols_str}) VALUES ({placeholders})"
-            
             # 執行批次寫入
             cursor.executemany(insert_sql, rows)
         conn.commit()
@@ -104,6 +143,7 @@ def insert_data(table_name, columns, rows):
         logger.error(f"寫入資料庫失敗: {e}")
     finally:
         conn.close()
+
 
 def save_to_csv(columns, data, filename="output.csv"):
     """將資料寫入 CSV 檔案"""
@@ -117,25 +157,56 @@ def save_to_csv(columns, data, filename="output.csv"):
     except Exception as e:
         logger.error(f"寫入 CSV 失敗: {e}")
 
+
 if __name__ == "__main__":
     if check_db_connection():
-        # 定義要匯出的資料表清單
-        table_names = [
-            "activity_day",
-            # "other_table_name", # 在此添加更多資料表
-        ]
-        
+        table_names = []
+        table_select_sqls = []
+
+        # 讀出 ./sql 目錄下的 SQL 指令
+        sql_files = os.listdir("./sql")
+        for sql_file in sql_files:
+            # 定義要匯出的資料表清單
+            table_names.append(sql_file.split(".")[0])
+            with open(f"./sql/{sql_file}", "r") as f:
+                sql = f.read()
+                table_select_sqls.append(sql)
+
         # 確保 csv 目錄存在
         dirs = "output"
         os.makedirs(f"./{dirs}", exist_ok=True)
 
         for table_name in table_names:
             try:
-                logger.info(f"正在處理資料表: {table_name}")
-                columns, data = fetch_data(table_name)
+                logger.warning(f"正在處理資料表: {table_name}")
+                # 透過 table_name 查出對應的查詢 SQL
+
+                table_index = table_names.index(table_name)
+                select_sql = table_select_sqls[table_index]
+
+                # 替換代碼 (Token) ##USER_ID##
+                select_sql = select_sql.replace("##USER_ID##", source_user_id)
+
+                # 算出今年的年份                
+                current_year = datetime.now().year
+                select_sql = select_sql.replace("##YEAR##", str(current_year))
+
+                # 計算出今天的年月日，格式為 YYYY-MM-DD
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                select_sql = select_sql.replace("##TODAY##", today_str)
+
+                # 計算出今天第幾周
+                now = datetime.now()
+                current_week = get_custom_week_number(now.date())
+                select_sql = select_sql.replace("##WEEK##", str(current_week))
+
+                print(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK## => {current_week} ")
+
+                logger.warning(f"正在執行查詢: {select_sql}")
+
+                columns, data = fetch_data(select_sql)
                 if data:
                     save_to_csv(columns, data, f"./{dirs}/{table_name}.csv")
-                    
                     # 同步寫入目標資料庫
                     insert_data(f"{table_name}_backup", columns, data)
                 else:
@@ -144,3 +215,4 @@ if __name__ == "__main__":
                 logger.error(f"處理資料表 {table_name} 時發生錯誤: {e}")
     else:
         logger.error("無法連線至資料庫，程式終止。")
+
