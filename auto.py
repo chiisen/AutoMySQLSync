@@ -8,8 +8,6 @@ from datetime import datetime, timedelta, date as datetime_date
 
 
 # 載入 .env 檔案
-
-
 load_dotenv()
 
 
@@ -31,6 +29,30 @@ def get_custom_week_number(date):
         week_num = 52  # 或計算上一年
     
     return week_num
+
+
+# 定義 user_id 的置換對應表
+USER_ID_MAPPING = {
+    6: 60,
+    10: 30,
+    13: 17,
+    17: 13,
+    21: 5,
+    22: 32,
+    54: 38,
+    73: 69,
+    85: 66,
+    127: 65,
+    306: 53,
+    580: 164,
+    1478: 498,
+    1069: 61,
+    2793: 490,
+    3283: 492,
+    7351: 1238,
+    9567: 1239,
+    14755: 1218
+}
 
 
 # 設定日誌格式
@@ -126,6 +148,18 @@ def transform_data(rows):
 
 
 def insert_data(table_name, columns, rows):
+    # 檢查是否有 user_id 欄位，若有則進行轉換
+    if 'user_id' in columns:
+        user_id_idx = columns.index('user_id')
+        new_rows = []
+        for row in rows:
+            row_list = list(row)
+            original_uid = row_list[user_id_idx]
+            if original_uid in USER_ID_MAPPING:
+                row_list[user_id_idx] = USER_ID_MAPPING[original_uid]
+            new_rows.append(tuple(row_list))
+        rows = new_rows
+
     conn = pymysql.connect(**target_config)
     try:
         with conn.cursor() as cursor:
@@ -134,7 +168,7 @@ def insert_data(table_name, columns, rows):
             # 使用 backticks (`) 包裹欄位名稱以避免關鍵字衝突
             cols_str = ", ".join([f"`{col}`" for col in columns])
             placeholders = ", ".join(["%s"] * len(columns))
-            insert_sql = f"INSERT INTO `{table_name}` ({cols_str}) VALUES ({placeholders})"
+            insert_sql = f"INSERT IGNORE INTO `{table_name}` ({cols_str}) VALUES ({placeholders})"
             # 執行批次寫入
             cursor.executemany(insert_sql, rows)
         conn.commit()
