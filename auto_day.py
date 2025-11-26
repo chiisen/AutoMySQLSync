@@ -259,7 +259,15 @@ if __name__ == "__main__":
                 current_week = get_custom_week_number(now.date())
                 select_sql = select_sql.replace("##WEEK##", str(current_week))
 
-                logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK## => {current_week} ")
+                # 計算出今天第幾天
+                current_day_mon = now.weekday()
+                # 根據規格：星期日=1, 星期一=2, ... 星期六=7
+                # weekday(): Mon=0, ... Sun=6
+                current_day_sun = (current_day_mon + 1) % 7 + 1
+                select_sql = select_sql.replace("##DAY_MON##", str(current_day_mon))
+                select_sql = select_sql.replace("##DAY_SUN##", str(current_day_sun))
+
+                logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK## => {current_week} , ##DAY_MON## => {current_day_mon} , ##DAY_SUN## => {current_day_sun}")
 
                 logger.info(f"正在執行查詢: {select_sql}")
 
@@ -283,7 +291,7 @@ if __name__ == "__main__":
                     sql = f.read()
 
                     # 替換代碼 (Token) ##USER_ID##
-                    sql = sql.replace("##USER_ID##", source_user_id)
+                    sql = sql.replace("##USER_ID##", target_user_id)
 
                     # 算出今年的年份                
                     current_year = datetime.now().year
@@ -298,7 +306,15 @@ if __name__ == "__main__":
                     current_week = get_custom_week_number(now.date())
                     sql = sql.replace("##WEEK##", str(current_week))
 
-                    logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK## => {current_week} ")
+                    # 計算出今天第幾天
+                    current_day_mon = now.weekday()
+                    # 根據規格：星期日=1, 星期一=2, ... 星期六=7
+                    # weekday(): Mon=0, ... Sun=6
+                    current_day_sun = (current_day_mon + 1) % 7 + 1
+                    sql = sql.replace("##DAY_MON##", str(current_day_mon))
+                    sql = sql.replace("##DAY_SUN##", str(current_day_sun))
+
+                    logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK## => {current_week}, ##DAY_MON## => {current_day_mon}, ##DAY_SUN## => {current_day_sun} ")
 
                     logger.warning(f"正在執行統計 SQL 指令: {sql_file}")
 
