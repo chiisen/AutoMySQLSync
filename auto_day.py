@@ -107,11 +107,14 @@ target_config = {
     'charset': 'utf8mb4'
 }
 
+# 目前還沒用到
 target_user_id = os.getenv('TARGET_DB_USER_ID')
 
 
 def check_db_connection():
-    """檢查資料庫連線"""
+    """
+    檢查資料庫連線
+    """
     try:
         conn = pymysql.connect(**source_config)
         with conn.cursor() as cursor:
@@ -197,18 +200,19 @@ if __name__ == "__main__":
         table_names = []
         table_select_sqls = []
 
-        # 讀出 ./sql 目錄下的 SQL 指令
-        sql_files = os.listdir("./sql")
+        # 讀出 ./sql/day 目錄下的 SQL 指令  
+        sql_dir = "./sql/day"
+        sql_files = os.listdir(sql_dir)
         for sql_file in sql_files:
             # 定義要匯出的資料表清單
             table_names.append(sql_file.split(".")[0])
-            with open(f"./sql/{sql_file}", "r") as f:
+            with open(f"{sql_dir}/{sql_file}", "r") as f:
                 sql = f.read()
                 table_select_sqls.append(sql)
 
         # 確保 csv 目錄存在
-        dirs = "output"
-        os.makedirs(f"./{dirs}", exist_ok=True)
+        dirs = "./output/day"
+        os.makedirs(dirs, exist_ok=True)
 
         for table_name in table_names:
             try:
@@ -247,6 +251,20 @@ if __name__ == "__main__":
                     logger.warning(f"資料表 {table_name} 無資料")
             except Exception as e:
                 logger.error(f"處理資料表 {table_name} 時發生錯誤: {e}")
+
+        # 執行目錄 ./sql_execute 下的 SQL 指令
+        sql_dir = "./sql_execute/day"
+        sql_files = os.listdir(sql_dir)
+        for sql_file in sql_files:
+            try:
+                logger.warning(f"正在執行 SQL 指令: {sql_file}")
+                with open(f"{sql_dir}/{sql_file}", "r") as f:
+                    sql = f.read()
+
+                    # 測試用，所以先不執行
+                    #execute_sql(sql)
+            except Exception as e:
+                logger.error(f"執行 SQL 指令 {sql_file} 時發生錯誤: {e}")
     else:
         logger.error("無法連線至資料庫，程式終止。")
 

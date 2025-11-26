@@ -206,5 +206,9 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# output
+# output 資料夾，用來存放輸出的資料
 output/
+
+# backup 資料夾，用來存放備份的資料
+backup/
+

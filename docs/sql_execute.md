@@ -1,0 +1,12 @@
+# activity_day_of_first_monday_online
+activity_day_of_first_monday => activity_day_of_first_monday_online
+
+# activity_day_of_first_monday_sport_item_online
+activity_day_of_first_monday => activity_day_of_first_monday_sport_item_online
+
+# activity_day_online
+activity_day => activity_day_online
+
+# activity_day_sport_item_online
+activity_day => activity_day_sport_item_online
+
