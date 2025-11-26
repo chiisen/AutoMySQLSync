@@ -194,6 +194,30 @@ def insert_data(table_name, columns, rows):
     conn = pymysql.connect(**target_config)
     try:
         with conn.cursor() as cursor:
+            # 若有資料要寫入，先執行刪除指定資料的動作
+            if rows:
+                now = get_now()
+                current_year = now.year
+                current_month = now.month
+                
+                delete_sql = f"DELETE FROM `{table_name}` WHERE user_id IN ({target_user_id}) AND year_num = {current_year} AND month_num = {current_month}"
+                logger.debug(f"執行刪除舊資料: {delete_sql}")
+                cursor.execute(delete_sql)
+
+                if  table_name == "activity_month":
+                    delete_sql = f"DELETE FROM activity_month_online WHERE user_id IN ({target_user_id}) AND year_num = {current_year} AND month_num = {current_month}"
+                    logger.debug(f"執行刪除舊資料: {delete_sql}")
+                    cursor.execute(delete_sql)
+
+                    delete_sql = f"DELETE FROM activity_month_sport_item_online WHERE user_id IN ({target_user_id}) AND year_num = {current_year} AND month_num = {current_month}"
+                    logger.debug(f"執行刪除舊資料: {delete_sql}")
+                    cursor.execute(delete_sql)
+
+                if table_name== "activity_month_weight_training":
+                    delete_sql = f"DELETE FROM activity_month_weight_training_online WHERE user_id IN ({target_user_id}) AND year_num = {current_year} AND month_num = {current_month}"
+                    logger.debug(f"執行刪除舊資料: {delete_sql}")
+                    cursor.execute(delete_sql)
+
             # 動態產生 INSERT SQL 指令
             # 格式: INSERT IGNORE INTO table_name (col1, col2, ...) VALUES (%s, %s, ...)
             # 使用 backticks (`) 包裹欄位名稱以避免關鍵字衝突
@@ -245,8 +269,8 @@ if __name__ == "__main__":
         table_names = []
         table_select_sqls = []
 
-        # 讀出 ./sql/day 目錄下的 SQL 指令  
-        sql_dir = "./sql/day"
+        # 讀出 ./sql/month 目錄下的 SQL 指令  
+        sql_dir = "./sql/month"
         sql_files = os.listdir(sql_dir)
         for sql_file in sql_files:
             # 定義要匯出的資料表清單
@@ -256,7 +280,7 @@ if __name__ == "__main__":
                 table_select_sqls.append(sql)
 
         # 確保 csv 目錄存在
-        dirs = "./output/day"
+        dirs = "./output/month"
         os.makedirs(dirs, exist_ok=True)
 
         for table_name in table_names:
@@ -285,6 +309,15 @@ if __name__ == "__main__":
                 select_sql = select_sql.replace("##WEEK_MON##", str(current_week_mon))
                 select_sql = select_sql.replace("##WEEK_SUN##", str(current_week_sun))
 
+                # 計算出今天第幾月
+                current_month = now.month
+                select_sql = select_sql.replace("##MONTH##", str(current_month))
+                
+                # ##MONTH_START## => 這個月第一天
+                # ##MONTH_END## => 這個月最後一天
+                select_sql = select_sql.replace("##MONTH_START##", f"{current_year}-{current_month}-01")
+                select_sql = select_sql.replace("##MONTH_END##", f"{current_year}-{current_month}-31")
+
                 # 計算出今天第幾天
                 current_day_mon = now.weekday()
                 # 根據規格：星期日=1, 星期一=2, ... 星期六=7
@@ -308,7 +341,7 @@ if __name__ == "__main__":
                 logger.error(f"處理資料表 {table_name} 時發生錯誤: {e}")
 
         # 執行目錄 ./sql_execute 下的 SQL 指令
-        sql_dir = "./sql_execute/day"
+        sql_dir = "./sql_execute/month"
         sql_files = os.listdir(sql_dir)
         for sql_file in sql_files:
             try:
@@ -334,6 +367,15 @@ if __name__ == "__main__":
                     
                     sql = sql.replace("##WEEK_MON##", str(current_week_mon))
                     sql = sql.replace("##WEEK_SUN##", str(current_week_sun))
+
+                    # 計算出今天第幾月
+                    current_month = now.month
+                    sql = sql.replace("##MONTH##", str(current_month))
+
+                    # ##MONTH_START## => 這個月第一天
+                    # ##MONTH_END## => 這個月最後一天
+                    sql = sql.replace("##MONTH_START##", f"{current_year}-{current_month}-01")
+                    sql = sql.replace("##MONTH_END##", f"{current_year}-{current_month}-31")
 
                     # 計算出今天第幾天
                     current_day_mon = now.weekday()
