@@ -171,7 +171,7 @@ def insert_data(table_name, columns, rows):
     try:
         with conn.cursor() as cursor:
             # 動態產生 INSERT SQL 指令
-            # 格式: INSERT INTO table_name (col1, col2, ...) VALUES (%s, %s, ...)
+            # 格式: INSERT IGNORE INTO table_name (col1, col2, ...) VALUES (%s, %s, ...)
             # 使用 backticks (`) 包裹欄位名稱以避免關鍵字衝突
             cols_str = ", ".join([f"`{col}`" for col in columns])
             placeholders = ", ".join(["%s"] * len(columns))
@@ -179,7 +179,7 @@ def insert_data(table_name, columns, rows):
             # 執行批次寫入
             cursor.executemany(insert_sql, rows)
         conn.commit()
-        logger.info(f"成功寫入 {len(rows)} 筆資料至目標資料庫的 {table_name} 資料表")
+        logger.debug(f"成功寫入 INSERT IGNORE INTO : {len(rows)} 筆資料至目標資料庫的 {table_name} 資料表")
     except Exception as e:
         logger.error(f"寫入資料庫失敗: {e}")
     finally:
@@ -194,7 +194,7 @@ def save_to_csv(columns, data, filename="output.csv"):
             writer = csv.writer(f)
             writer.writerow(columns)
             writer.writerows(data)
-        logger.info(f"資料已成功寫入 {filename}")
+        logger.debug(f"資料已成功寫入 {filename} csv 檔")
     except Exception as e:
         logger.error(f"寫入 CSV 失敗: {e}")
 
@@ -244,11 +244,11 @@ if __name__ == "__main__":
 
                 logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK## => {current_week} ")
 
-                logger.warning(f"正在執行查詢: {select_sql}")
+                logger.info(f"正在執行查詢: {select_sql}")
 
                 columns, data = fetch_data(select_sql)
                 if data:
-                    save_to_csv(columns, data, f"./{dirs}/{table_name}.csv")
+                    save_to_csv(columns, data, f"{dirs}/{table_name}.csv")
                     # 同步寫入目標資料庫
                     insert_data(f"{table_name}_backup", columns, data)
                 else:
