@@ -19,3 +19,11 @@ CREATE TABLE 的 SQL 語法
 ## crontab
 [crontab](./docs/crontab.md)
 
+## 將專案推送到 GitLab 或 GitHub：
+```bash
+# GitLab
+git push gitlab main
+
+# GitHub
+git push github main
+```
