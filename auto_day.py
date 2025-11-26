@@ -115,6 +115,26 @@ target_config = {
 target_user_id = os.getenv('TARGET_DB_USER_ID')
 
 
+
+def get_now():
+    """
+    取得當前時間，若有設定環境變數 TEST_DATE 則使用該時間
+    TEST_DATE 格式: YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS
+    """
+    test_date = os.getenv('TEST_DATE')
+    if test_date:
+        try:
+            # 嘗試解析包含時間的格式
+            return datetime.strptime(test_date, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            try:
+                # 嘗試解析只包含日期的格式
+                return datetime.strptime(test_date, "%Y-%m-%d")
+            except ValueError:
+                logger.warning(f"TEST_DATE 格式錯誤: {test_date}，將使用系統時間。")
+    return datetime.now()
+
+
 def check_db_connection():
     """
     檢查資料庫連線
@@ -247,15 +267,15 @@ if __name__ == "__main__":
                 select_sql = select_sql.replace("##USER_ID##", source_user_id)
 
                 # 算出今年的年份                
-                current_year = datetime.now().year
+                current_year = get_now().year
                 select_sql = select_sql.replace("##YEAR##", str(current_year))
 
                 # 計算出今天的年月日，格式為 YYYY-MM-DD
-                today_str = datetime.now().strftime("%Y-%m-%d")
+                today_str = get_now().strftime("%Y-%m-%d")
                 select_sql = select_sql.replace("##TODAY##", today_str)
 
                 # 計算出今天第幾周
-                now = datetime.now()
+                now = get_now()
                 current_week = get_custom_week_number(now.date())
                 select_sql = select_sql.replace("##WEEK##", str(current_week))
 
@@ -294,15 +314,15 @@ if __name__ == "__main__":
                     sql = sql.replace("##USER_ID##", target_user_id)
 
                     # 算出今年的年份                
-                    current_year = datetime.now().year
+                    current_year = get_now().year
                     sql = sql.replace("##YEAR##", str(current_year))
 
                     # 計算出今天的年月日，格式為 YYYY-MM-DD
-                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    today_str = get_now().strftime("%Y-%m-%d")
                     sql = sql.replace("##TODAY##", today_str)
 
                     # 計算出今天第幾周
-                    now = datetime.now()
+                    now = get_now()
                     current_week = get_custom_week_number(now.date())
                     sql = sql.replace("##WEEK##", str(current_week))
 
