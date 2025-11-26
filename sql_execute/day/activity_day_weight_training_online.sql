@@ -33,5 +33,5 @@ WHERE
     old.user_id IN (
         ##USER_ID##)
         AND old.year_num = ##YEAR##
-        AND old.week_num = ##WEEK##
+        AND old.week_num = ##WEEK_SUN##
         AND old.day_num = ##DAY_SUN##;

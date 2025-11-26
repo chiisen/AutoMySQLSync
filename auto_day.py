@@ -11,21 +11,25 @@ from datetime import datetime, timedelta, date as datetime_date
 load_dotenv()
 
 
-def get_custom_week_number(date):
-    # 找到該年的第一個星期日
+def get_custom_week_number(date, start_weekday=6):
+    """
+    計算自訂週數
+    start_weekday: 0=Monday, 6=Sunday (預設為Sunday)
+    """
+    # 找到該年的第一個指定星期幾
     first_day_of_year = datetime_date(date.year, 1, 1)
-    # 計算第一個星期日是哪一天
-    days_to_first_sunday = (6 - first_day_of_year.weekday()) % 7  # weekday: 0=Mon, 6=Sun
-    first_sunday = first_day_of_year + timedelta(days=days_to_first_sunday)
+    # 計算第一個指定星期幾是哪一天
+    days_to_first_target_day = (start_weekday - first_day_of_year.weekday()) % 7  # weekday: 0=Mon, 6=Sun
+    first_target_day = first_day_of_year + timedelta(days=days_to_first_target_day)
     
-    # 計算從第一個星期日到當前日期的天數
-    days_since_first_sunday = (date - first_sunday).days
+    # 計算從第一個指定星期幾到當前日期的天數
+    days_since_first_target_day = (date - first_target_day).days
     
     # 週數 = 天數 // 7 + 1
-    if days_since_first_sunday >= 0:
-        week_num = (days_since_first_sunday // 7) + 1
+    if days_since_first_target_day >= 0:
+        week_num = (days_since_first_target_day // 7) + 1
     else:
-        # 如果日期在第一個星期日前，使用上一年的週數（這裡簡化，實際可能需要調整）
+        # 如果日期在第一個指定星期幾前，使用上一年的週數（這裡簡化，實際可能需要調整）
         week_num = 52  # 或計算上一年
     
     return week_num
@@ -276,8 +280,10 @@ if __name__ == "__main__":
 
                 # 計算出今天第幾周
                 now = get_now()
-                current_week = get_custom_week_number(now.date())
-                select_sql = select_sql.replace("##WEEK##", str(current_week))
+                current_week_sun = get_custom_week_number(now.date(), start_weekday=6)
+                current_week_mon = get_custom_week_number(now.date(), start_weekday=0)
+                select_sql = select_sql.replace("##WEEK_MON##", str(current_week_mon))
+                select_sql = select_sql.replace("##WEEK_SUN##", str(current_week_sun))
 
                 # 計算出今天第幾天
                 current_day_mon = now.weekday()
@@ -287,7 +293,7 @@ if __name__ == "__main__":
                 select_sql = select_sql.replace("##DAY_MON##", str(current_day_mon))
                 select_sql = select_sql.replace("##DAY_SUN##", str(current_day_sun))
 
-                logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK## => {current_week} , ##DAY_MON## => {current_day_mon} , ##DAY_SUN## => {current_day_sun}")
+                logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK_MON## => {current_week_mon}, ##WEEK_SUN## => {current_week_sun}, ##DAY_MON## => {current_day_mon} , ##DAY_SUN## => {current_day_sun}")
 
                 logger.info(f"正在執行查詢: {select_sql}")
 
@@ -323,8 +329,11 @@ if __name__ == "__main__":
 
                     # 計算出今天第幾周
                     now = get_now()
-                    current_week = get_custom_week_number(now.date())
-                    sql = sql.replace("##WEEK##", str(current_week))
+                    current_week_sun = get_custom_week_number(now.date(), start_weekday=6)
+                    current_week_mon = get_custom_week_number(now.date(), start_weekday=0)
+                    
+                    sql = sql.replace("##WEEK_MON##", str(current_week_mon))
+                    sql = sql.replace("##WEEK_SUN##", str(current_week_sun))
 
                     # 計算出今天第幾天
                     current_day_mon = now.weekday()
@@ -334,7 +343,7 @@ if __name__ == "__main__":
                     sql = sql.replace("##DAY_MON##", str(current_day_mon))
                     sql = sql.replace("##DAY_SUN##", str(current_day_sun))
 
-                    logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK## => {current_week}, ##DAY_MON## => {current_day_mon}, ##DAY_SUN## => {current_day_sun} ")
+                    logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK_MON## => {current_week_mon}, ##WEEK_SUN## => {current_week_sun}, ##DAY_MON## => {current_day_mon}, ##DAY_SUN## => {current_day_sun} ")
 
                     logger.warning(f"正在執行統計 SQL 指令: {sql_file}")
 
