@@ -57,6 +57,7 @@ USER_ID_MAPPING = {
 
 # 設定日誌格式
 class CustomFormatter(logging.Formatter):
+    blue = "\x1b[34;20m"
     white = "\x1b[37;20m"
     yellow = "\x1b[33;20m"
     red = "\x1b[31;20m"
@@ -64,6 +65,7 @@ class CustomFormatter(logging.Formatter):
     format_str = "%(asctime)s - %(levelname)s - %(message)s"
 
     FORMATS = {
+        logging.DEBUG: blue + format_str + reset,
         logging.INFO: white + format_str + reset,
         logging.WARNING: yellow + format_str + reset,
         logging.ERROR: red + format_str + reset,
@@ -77,7 +79,9 @@ class CustomFormatter(logging.Formatter):
 
 logger = logging.getLogger()
 
-logger.setLevel(logging.INFO)
+# 設定日誌層級，預設為 INFO
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 handler = logging.StreamHandler(sys.stdout)
 
@@ -120,11 +124,11 @@ def check_db_connection():
         with conn.cursor() as cursor:
             cursor.execute("SELECT VERSION()")
             version = cursor.fetchone()
-            logger.info(f"資料庫連線成功！版本: {version[0]}")
+            logger.info(f"{source_config['host']} 資料庫連線成功！版本: {version[0]}")
         conn.close()
         return True
     except Exception as e:
-        logger.error(f"資料庫連線失敗: {e}")
+        logger.error(f"{source_config['host']} 資料庫連線失敗: {e}")
         return False
 
 
@@ -238,7 +242,7 @@ if __name__ == "__main__":
                 current_week = get_custom_week_number(now.date())
                 select_sql = select_sql.replace("##WEEK##", str(current_week))
 
-                print(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK## => {current_week} ")
+                logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK## => {current_week} ")
 
                 logger.warning(f"正在執行查詢: {select_sql}")
 
@@ -260,6 +264,26 @@ if __name__ == "__main__":
                 logger.warning(f"正在執行 SQL 指令: {sql_file}")
                 with open(f"{sql_dir}/{sql_file}", "r") as f:
                     sql = f.read()
+
+                    # 替換代碼 (Token) ##USER_ID##
+                    sql = sql.replace("##USER_ID##", source_user_id)
+
+                    # 算出今年的年份                
+                    current_year = datetime.now().year
+                    sql = sql.replace("##YEAR##", str(current_year))
+
+                    # 計算出今天的年月日，格式為 YYYY-MM-DD
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    sql = sql.replace("##TODAY##", today_str)
+
+                    # 計算出今天第幾周
+                    now = datetime.now()
+                    current_week = get_custom_week_number(now.date())
+                    sql = sql.replace("##WEEK##", str(current_week))
+
+                    logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK## => {current_week} ")
+
+                    logger.warning(f"正在執行統計 SQL 指令: {sql_file}")
 
                     # 測試用，所以先不執行
                     #execute_sql(sql)

@@ -15,6 +15,10 @@ crontab -e
 # 範例：每天早上 8:00 執行，並將輸出存到 log 檔
 0 8 * * * cd /root/automysqlsync && /root/automysqlsync/.venv/bin/python auto_day.py >> /root/automysqlsync/cron.log 2>&1
 ```
+```bash
+# 範例：每天凌晨 1 點執行
+0 1 * * * cd /root/automysqlsync && /usr/bin/python3 auto_day.py >> /root/automysqlsync/cron.log 2>&1
+```
 - 指令解析：
 
 1. 0 8 * * *: 時間設定 (分 時 日 月 週)。
@@ -27,7 +31,11 @@ crontab -e
 ## 寫法 B：使用 Wrapper Shell Script (進階)
 如果您需要設定很多環境變數，或者邏輯較複雜，可以寫一個 shell script 來包裝。
 
-建立 run_sync.sh:
+建立 run_day_sync.sh:
+```bash
+which python3
+```
+可以查詢 python3 的路徑
 ```bash
 #!/bin/bash
 cd /root/automysqlsync
@@ -36,7 +44,7 @@ python auto_day.py
 ```
 然後在 crontab 中執行這個 .sh 檔：
 ```bash
-0 8 * * * /root/automysqlsync/run_sync.sh >> /root/automysqlsync/cron.log 2>&1
+0 8 * * * /root/automysqlsync/run_day_sync.sh >> /root/automysqlsync/cron.log 2>&1
 ```
 ## 常見問題檢查
 1. 權限: 確保 auto_day.py (或 .sh 檔) 有執行權限，雖然直接用 python auto_day.py 不需要 x 權限，但確保目錄可讀寫是必要的。
