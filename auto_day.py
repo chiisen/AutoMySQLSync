@@ -199,6 +199,23 @@ def save_to_csv(columns, data, filename="output.csv"):
         logger.error(f"寫入 CSV 失敗: {e}")
 
 
+def execute_sql(sql):
+    """
+    執行 SQL 指令 (針對目標資料庫)
+    """
+    conn = pymysql.connect(**target_config)
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(sql)
+        conn.commit()
+        logger.debug("SQL 指令執行成功")
+    except Exception as e:
+        logger.error(f"SQL 指令執行失敗: {e}")
+        raise e
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     if check_db_connection():
         table_names = []
@@ -250,7 +267,7 @@ if __name__ == "__main__":
                 if data:
                     save_to_csv(columns, data, f"{dirs}/{table_name}.csv")
                     # 同步寫入目標資料庫
-                    insert_data(f"{table_name}_backup", columns, data)
+                    insert_data(f"{table_name}", columns, data)
                 else:
                     logger.warning(f"資料表 {table_name} 無資料")
             except Exception as e:
@@ -286,7 +303,7 @@ if __name__ == "__main__":
                     logger.warning(f"正在執行統計 SQL 指令: {sql_file}")
 
                     # 測試用，所以先不執行
-                    #execute_sql(sql)
+                    execute_sql(sql)
             except Exception as e:
                 logger.error(f"執行 SQL 指令 {sql_file} 時發生錯誤: {e}")
     else:
