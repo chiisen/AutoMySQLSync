@@ -16,8 +16,26 @@ crontab -e
 0 8 * * * cd /root/automysqlsync && /root/automysqlsync/.venv/bin/python auto_day.py >> /root/automysqlsync/cron.log 2>&1
 ```
 ```bash
-# 範例：每天凌晨 1 點執行
-0 1 * * * cd /root/automysqlsync && /usr/bin/python3 auto_day.py >> /root/automysqlsync/cron.log 2>&1
+# 11:01 同步當天的 day 統計資料
+01 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_day.py >> /root/automysqlsync/cron_day.log 2>&1
+
+# 11:02 同步當天的 week 統計資料
+02 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_week.py >> /root/automysqlsync/cron_week.log 2>&1
+
+# 11:03 同步當天的 month 統計資料
+03 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_month.py >> /root/automysqlsync/cron_month.log 2>&1
+
+# 11:04 同步當天的 info 統計資料
+04 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_info.py >> /root/automysqlsync/cron_info.log$ 2>&1
+
+# 11:05 同步當天的 file_info 統計資料
+05 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_file_info.py >> /root/automysqlsync/cron_file_info.log$ 2>&1
+
+# 11:06 同步當天的 lap 統計資料
+06 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_lap.py >> /root/automysqlsync/cron_lap.log$ 2>&1
+
+# 11:07 同步當天的 point 統計資料
+07 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_point.py >> /root/automysqlsync/cron_point.log$ 2>&1
 ```
 - 指令解析：
 
