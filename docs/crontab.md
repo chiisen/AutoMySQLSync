@@ -26,16 +26,16 @@ crontab -e
 03 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_month.py >> /root/automysqlsync/cron_month.log 2>&1
 
 # 11:04 同步當天的 info 統計資料
-04 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_info.py >> /root/automysqlsync/cron_info.log$ 2>&1
+04 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_info.py >> /root/automysqlsync/cron_info.log 2>&1
 
 # 11:05 同步當天的 file_info 統計資料
-05 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_file_info.py >> /root/automysqlsync/cron_file_info.log$ 2>&1
+05 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_file_info.py >> /root/automysqlsync/cron_file_info.log 2>&1
 
 # 11:06 同步當天的 lap 統計資料
-06 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_lap.py >> /root/automysqlsync/cron_lap.log$ 2>&1
+06 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_lap.py >> /root/automysqlsync/cron_lap.log 2>&1
 
 # 11:07 同步當天的 point 統計資料
-07 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_point.py >> /root/automysqlsync/cron_point.log$ 2>&1
+07 23 * * * cd /root/automysqlsync && /usr/bin/python3 auto_point.py >> /root/automysqlsync/cron_point.log 2>&1
 ```
 - 指令解析：
 
