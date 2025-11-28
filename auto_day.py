@@ -148,7 +148,15 @@ def check_db_connection():
         with conn.cursor() as cursor:
             cursor.execute("SELECT VERSION()")
             version = cursor.fetchone()
-            logger.info(f"{source_config['host']} 資料庫連線成功！版本: {version[0]}")
+
+            # log 要記錄今天執行是日期
+            today_str = get_now().strftime("%Y-%m-%d")
+            logger.debug(f"========================================================")
+            logger.debug(f"執行日期: {today_str}")    
+            logger.debug(f"========================================================")
+            logger.debug(f"來源資料庫: {source_config['host']} 資料庫連線成功！版本: {version[0]}")
+            logger.debug(f"目標資料庫: {target_config['host']}")
+            logger.debug(f"========================================================")
         conn.close()
         return True
     except Exception as e:
