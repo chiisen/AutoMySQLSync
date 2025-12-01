@@ -178,15 +178,6 @@ def fetch_data(select_sql):
         conn.close()
 
 
-def transform_data(rows):
-    transformed = []
-    for row in rows:
-        # 示範轉換：value 欄位加 1
-        new_value = row[1] + 1
-        transformed.append((row[0], new_value))
-    return transformed
-
-
 def insert_data(table_name, columns, rows):
     # 檢查是否有 user_id 欄位，若有則進行轉換
     if 'user_id' in columns:
