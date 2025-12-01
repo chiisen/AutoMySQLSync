@@ -154,6 +154,7 @@ def check_db_connection():
             today_str = get_now().strftime("%Y-%m-%d")
             logger.debug(f"========================================================")
             logger.debug(f"執行日期: {today_str}")    
+            logger.debug(f"執行腳本: auto_point.py")    
             logger.debug(f"========================================================")
             logger.debug(f"來源資料庫: {source_config['host']} 資料庫連線成功！版本: {version[0]}")
             logger.debug(f"目標資料庫: {target_config['host']}")
@@ -189,6 +190,11 @@ def insert_data(table_name, columns, rows):
             if original_uid in USER_ID_MAPPING:
                 row_list[user_id_idx] = USER_ID_MAPPING[original_uid]
             new_rows.append(tuple(row_list))
+        
+        # 檢查轉換後是否有重複資料 (僅供除錯提示)
+        if len(new_rows) != len(set(new_rows)):
+            logger.warning(f"注意: 資料表 {table_name} 在 user_id 轉換後發現重複資料，這可能導致 INSERT IGNORE 寫入筆數減少。")
+
         rows = new_rows
 
     conn = pymysql.connect(**target_config)
@@ -221,7 +227,10 @@ def insert_data(table_name, columns, rows):
                     logger.warning(f"  ... 還有 {len(warnings) - 5} 筆警告未顯示")
 
         conn.commit()
-        logger.debug(f"資料表 {table_name}: 預計寫入 {len(rows)} 筆, 成功 {affected_rows} 筆, 忽略 {ignored_count} 筆")
+        if len(rows) != affected_rows:
+            logger.warning(f"目標資料庫: {target_config['host']}，資料表 {table_name}: 預計寫入 {len(rows)} 筆, 成功 {affected_rows} 筆, 忽略 {ignored_count} 筆")
+        else:
+            logger.info(f"目標資料庫: {target_config['host']}，資料表 {table_name}: 預計寫入 {len(rows)} 筆, 成功 {affected_rows} 筆, 忽略 {ignored_count} 筆")
     except Exception as e:
         logger.error(f"寫入資料庫失敗: {e}")
     finally:
@@ -236,7 +245,7 @@ def save_to_csv(columns, data, filename="output.csv"):
             writer = csv.writer(f)
             writer.writerow(columns)
             writer.writerows(data)
-        logger.debug(f"資料已成功寫入 {filename} csv 檔")
+        logger.debug(f"資料已成功寫入 {filename} 共 {len(data)} 筆資料至 csv 檔")
     except Exception as e:
         logger.error(f"寫入 CSV 失敗: {e}")
 
@@ -262,7 +271,7 @@ if __name__ == "__main__":
 
         for table_name in table_names:
             try:
-                logger.warning(f"正在處理資料表: {table_name}")
+                logger.info(f"正在處理資料表: {table_name}")
                 # 透過 table_name 查出對應的查詢 SQL
 
                 table_index = table_names.index(table_name)
@@ -317,9 +326,8 @@ if __name__ == "__main__":
                         # 延遲 5 秒再執行下一個，避免資料庫忙碌
                         time.sleep(5)
                     else:
-                        logger.warning(f"資料表 {table_name} user_id:{user_id} 無資料")
+                        logger.warning(f"來源資料庫: {source_config['host']}，資料表 {table_name} user_id:{user_id} 無資料")
 
-                
             except Exception as e:
                 logger.error(f"處理資料表 {table_name} 時發生錯誤: {e}")
     else:
