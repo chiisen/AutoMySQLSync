@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta, date as datetime_date
+import logging
+
 
 def get_custom_week_number(date, start_weekday=6):
     """
@@ -45,3 +47,25 @@ USER_ID_MAPPING = {
     9567: 1239,
     14755: 1218
 }
+
+# 設定日誌格式
+class CustomFormatter(logging.Formatter):
+    blue = "\x1b[34;20m"
+    white = "\x1b[37;20m"
+    yellow = "\x1b[33;20m"
+    red = "\x1b[31;20m"
+    reset = "\x1b[0m"
+    format_str = "%(asctime)s - %(levelname)s - %(message)s"
+
+    FORMATS = {
+        logging.DEBUG: blue + format_str + reset,
+        logging.INFO: white + format_str + reset,
+        logging.WARNING: yellow + format_str + reset,
+        logging.ERROR: red + format_str + reset,
+        logging.CRITICAL: red + format_str + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno, self.white + self.format_str + self.reset)
+        formatter = logging.Formatter(log_fmt, datefmt='%Y-%m-%d %H:%M:%S')
+        return formatter.format(record)
