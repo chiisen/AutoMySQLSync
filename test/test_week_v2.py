@@ -5,7 +5,9 @@ import os
 # Add parent directory to sys.path to import auto_day
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from auto_day import get_custom_week_number
+from help import (
+    get_custom_week_number
+)
 
 # Test cases from docs/var.md
 # WEEK_SUN (start_weekday=6)
