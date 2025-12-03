@@ -1,222 +1,32 @@
 import os
 import sys
 import csv
-import logging
 import pymysql
-from dotenv import load_dotenv
-from datetime import datetime, timedelta, date as datetime_date
 from help import (
     get_custom_week_number,
     USER_ID_MAPPING,
     CustomFormatter,
+    fetch_data,
+    source_config,
+    target_config,
+    get_now,
+    save_to_csv,
+    save_to_csv_with_user_id_mapping,
+    logger,
+    source_user_id,
+    target_user_id,
+    check_db_connection,
+    execute_sql,
+    insert_data,
+    convert_user_id,
+    compare_data,
 )
 
-
-# 載入 .env 檔案
-load_dotenv()
-
-logger = logging.getLogger()
-
-# 設定日誌層級，預設為 INFO
-log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
-logger.setLevel(getattr(logging, log_level, logging.INFO))
-
-handler = logging.StreamHandler(sys.stdout)
-
-handler.setFormatter(CustomFormatter())
-
-logger.addHandler(handler)
-
-
-# 來源資料庫連線資訊
-source_config = {
-    'host': os.getenv('SOURCE_DB_HOST'),
-    'user': os.getenv('SOURCE_DB_USER'),
-    'password': os.getenv('SOURCE_DB_PASSWORD'),
-    'database': os.getenv('SOURCE_DB_NAME'),
-    'charset': 'utf8mb4'
-}
-
-source_user_id = os.getenv('SOURCE_DB_USER_ID')
-
-
-# 目標資料庫連線資訊
-target_config = {
-    'host': os.getenv('TARGET_DB_HOST'),
-    'user': os.getenv('TARGET_DB_USER'),
-    'password': os.getenv('TARGET_DB_PASSWORD'),
-    'database': os.getenv('TARGET_DB_NAME'),
-    'charset': 'utf8mb4'
-}
-
-# 目前還沒用到
-target_user_id = os.getenv('TARGET_DB_USER_ID')
-
-
-
-def get_now():
-    """
-    取得當前時間，若有設定環境變數 TEST_DATE 則使用該時間
-    TEST_DATE 格式: YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS
-    """
-    test_date = os.getenv('TEST_DATE')
-    if test_date:
-        try:
-            # 嘗試解析包含時間的格式
-            return datetime.strptime(test_date, "%Y-%m-%d %H:%M:%S")
-        except ValueError:
-            try:
-                # 嘗試解析只包含日期的格式
-                return datetime.strptime(test_date, "%Y-%m-%d")
-            except ValueError:
-                logger.warning(f"TEST_DATE 格式錯誤: {test_date}，將使用系統時間。")
-    return datetime.now()
-
-
-def check_db_connection():
-    """
-    檢查資料庫連線
-    """
-    try:
-        conn = pymysql.connect(**source_config)
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT VERSION()")
-            version = cursor.fetchone()
-
-            # log 要記錄今天執行是日期
-            today_str = get_now().strftime("%Y-%m-%d")
-            logger.debug(f"========================================================")
-            logger.debug(f"執行日期: {today_str}")    
-            logger.debug(f"執行腳本: auto_day_fix.py")    
-            logger.debug(f"========================================================")
-            logger.debug(f"來源資料庫: {source_config['host']} 資料庫連線成功！版本: {version[0]}")
-            logger.debug(f"目標資料庫: {target_config['host']}")
-            logger.debug(f"========================================================")
-        conn.close()
-        return True
-    except Exception as e:
-        logger.error(f"{source_config['host']} 資料庫連線失敗: {e}")
-        return False
-
-
-
-def fetch_data(select_sql):
-    """
-    取得來源資料庫的資料
-    """
-    conn = pymysql.connect(**source_config)
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute(select_sql)
-            columns = [desc[0] for desc in cursor.description]
-            results = cursor.fetchall()
-            return columns, results
-    finally:
-        conn.close()
-
-
-def insert_data(table_name, columns, rows):
-    # 檢查是否有 user_id 欄位，若有則進行轉換
-    if 'user_id' in columns:
-        user_id_idx = columns.index('user_id')
-        new_rows = []
-        for row in rows:
-            row_list = list(row)
-            original_uid = row_list[user_id_idx]
-            if original_uid in USER_ID_MAPPING:
-                row_list[user_id_idx] = USER_ID_MAPPING[original_uid]
-            new_rows.append(tuple(row_list))
-        
-        # 檢查轉換後是否有重複資料 (僅供除錯提示)
-        if len(new_rows) != len(set(new_rows)):
-            logger.warning(f"注意: 資料表 {table_name} 在 user_id 轉換後發現重複資料，這可能導致 INSERT IGNORE 寫入筆數減少。")
-
-        rows = new_rows
-
-    conn = pymysql.connect(**target_config)
-    try:
-        with conn.cursor() as cursor:
-            # 動態產生 INSERT SQL 指令
-            # 格式: INSERT IGNORE INTO table_name (col1, col2, ...) VALUES (%s, %s, ...)
-            # 使用 backticks (`) 包裹欄位名稱以避免關鍵字衝突
-            cols_str = ", ".join([f"`{col}`" for col in columns])
-            placeholders = ", ".join(["%s"] * len(columns))
-            insert_sql = f"INSERT IGNORE INTO `{table_name}` ({cols_str}) VALUES ({placeholders})"
-            # 執行批次寫入
-            cursor.executemany(insert_sql, rows)
-            affected_rows = cursor.rowcount
-        conn.commit()
-        if len(rows) != affected_rows:
-            logger.warning(f"目標資料庫: {target_config['host']}，成功寫入 INSERT IGNORE INTO : {affected_rows} 筆資料 (原本嘗試 {len(rows)} 筆) 至目標資料庫的 {table_name} 資料表")
-        else:
-            logger.info(f"目標資料庫: {target_config['host']}，成功寫入 INSERT IGNORE INTO : {affected_rows} 筆資料 (原本嘗試 {len(rows)} 筆) 至目標資料庫的 {table_name} 資料表")
-    except Exception as e:
-        logger.error(f"寫入資料庫失敗: {e}")
-    finally:
-        conn.close()
-
-
-def save_to_csv(columns, data, filename="output.csv"):
-    """將資料寫入 CSV 檔案"""
-    try:
-        # 使用 utf-8-sig 編碼以支援 Excel 開啟中文
-        with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
-            writer = csv.writer(f)
-            writer.writerow(columns)
-            writer.writerows(data)
-        logger.debug(f"資料已成功寫入 {filename} 共 {len(data)} 筆資料至 csv 檔")
-    except Exception as e:
-        logger.error(f"寫入 CSV 失敗: {e}")
-
-
-def save_to_csv_with_user_id_mapping(columns, data, filename="output.csv"):
-    """將資料寫入 CSV 檔案(已轉換過 user_id)"""
-
-    # 檢查是否有 user_id 欄位，若有則進行轉換 rows
-    if 'user_id' in columns:
-        user_id_idx = columns.index('user_id')
-        new_rows = []
-        for row in data:
-            row_list = list(row)
-            original_uid = row_list[user_id_idx]
-            if original_uid in USER_ID_MAPPING:
-                row_list[user_id_idx] = USER_ID_MAPPING[original_uid]
-            new_rows.append(tuple(row_list))
-        
-        # 檢查轉換後是否有重複資料 (僅供除錯提示)
-        if len(new_rows) != len(set(new_rows)):
-            logger.warning(f"注意: 資料表在 user_id 轉換後發現重複資料，這可能導致 INSERT IGNORE 寫入筆數減少。")
-
-    try:
-        # 使用 utf-8-sig 編碼以支援 Excel 開啟中文
-        with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
-            writer = csv.writer(f)
-            writer.writerow(columns)
-            writer.writerows(new_rows)
-        logger.debug(f"資料已成功寫入(已轉換過 user_id) {filename} 共 {len(new_rows)} 筆資料至 csv 檔")
-    except Exception as e:
-        logger.error(f"寫入 CSV 失敗: {e}")
-
-
-def execute_sql(sql):
-    """
-    執行 SQL 指令 (針對目標資料庫)
-    """
-    conn = pymysql.connect(**target_config)
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute(sql)
-        conn.commit()
-        logger.debug(f"目標資料庫: {target_config['host']}，SQL 指令執行成功")
-    except Exception as e:
-        logger.error(f"目標資料庫: {target_config['host']}，SQL 指令執行失敗: {e}")
-        raise e
-    finally:
-        conn.close()
+script_name = "auto_day_fix"
 
 
 if __name__ == "__main__":
-    if check_db_connection():
+    if check_db_connection(script_name):
         table_names = []
         table_select_sqls = []
 
@@ -243,7 +53,7 @@ if __name__ == "__main__":
                 select_sql = table_select_sqls[table_index]
 
                 # 替換代碼 (Token) ##USER_ID##
-                select_sql = select_sql.replace("##USER_ID##", source_user_id)
+                #select_sql = select_sql.replace("##USER_ID##", source_user_id)
 
                 # 算出今年的年份                
                 current_year = get_now().year
@@ -270,18 +80,50 @@ if __name__ == "__main__":
 
                 logger.debug(f"  計算出 ##YEAR## => {current_year} , ##TODAY## => {today_str} , ##WEEK_MON## => {current_week_mon}, ##WEEK_SUN## => {current_week_sun}, ##DAY_MON## => {current_day_mon} , ##DAY_SUN## => {current_day_sun}")
 
-                logger.info(f"來源資料庫: {source_config['host']}，正在執行查詢: {select_sql}")
-
-                columns, data = fetch_data(select_sql)
-                if data:
-                    save_to_csv(columns, data, f"{dirs}/{table_name}.csv")
-                    save_to_csv_with_user_id_mapping(columns, data, f"{dirs}/{table_name}_with_user_id_mapping.csv")
-                    # 同步寫入目標資料庫
-                    ################## insert_data(f"{table_name}", columns, data)
+                source_host = source_config['host']
+                host = source_host
+                source_select_sql = select_sql
+                source_select_sql = source_select_sql.replace("##USER_ID##", source_user_id)
+                logger.info(f"來源資料庫: {source_host}，正在執行查詢: {source_select_sql}")
+                
+                source_columns, source_data = fetch_data(source_config, source_select_sql)
+                if source_data:
+                    save_to_csv(source_columns, source_data, f"{dirs}/{table_name}_source.csv")
+                    save_to_csv_with_user_id_mapping(source_columns, source_data, f"{dirs}/{table_name}_source_with_user_id_mapping.csv")
                 else:
-                    logger.warning(f"來源資料庫: {source_config['host']}，資料表 {table_name} 無資料")
+                    logger.warning(f"來源資料庫: {source_host}，資料表 {table_name} 無資料")
+
+
+                target_host = target_config['host']
+                host = target_host
+                target_select_sql = select_sql
+                target_select_sql = target_select_sql.replace("##USER_ID##", target_user_id)
+
+                logger.info(f"目標資料庫: {target_host}，正在執行查詢: {target_select_sql}")
+
+                target_columns, target_data = fetch_data(target_config, target_select_sql)
+                if target_data:
+                    save_to_csv(target_columns, target_data, f"{dirs}/{table_name}_target.csv")
+                    save_to_csv_with_user_id_mapping(target_columns, target_data, f"{dirs}/{table_name}_target_with_user_id_mapping.csv")
+                else:
+                    logger.warning(f"目標資料庫: {target_host}，資料表 {table_name} 無資料")
+
+                # 比對來源和目標資料
+                if source_data and target_data:
+                    # source_data 需要轉換 user_id，target_data 不需要
+                    source_data_with_user_id_mapping = convert_user_id(source_columns, source_data)
+                    # 比對來源和目標資料
+                    diff_data = compare_data(source_data_with_user_id_mapping, target_data)
+                    if diff_data:
+                        logger.warning(f"資料表 {table_name} 有差異，正在寫入差異資料到 CSV 檔案")
+                        save_to_csv(target_columns, diff_data, f"{dirs}/{table_name}_diff.csv")
+                        # 同步寫入目標資料庫
+                        insert_data(f"{table_name}", target_columns, diff_data)
+                    else:
+                        logger.info(f"資料表 {table_name} 無差異")  
+                
             except Exception as e:
-                logger.error(f"處理資料表 {table_name} 時發生錯誤: {e}")
+                logger.error(f"處理資料庫: {host}，資料表 {table_name} 時發生錯誤: {e}")
 
         # 執行目錄 ./sql_execute 下的 SQL 指令
         sql_dir = "./sql_execute/day"

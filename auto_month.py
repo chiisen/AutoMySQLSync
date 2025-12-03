@@ -1,118 +1,31 @@
 import os
 import sys
 import csv
-import logging
 import pymysql
-from dotenv import load_dotenv
-from datetime import datetime, timedelta, date as datetime_date
 from help import (
     get_custom_week_number,
     USER_ID_MAPPING,
     CustomFormatter,
+    fetch_data,
+    source_config,
+    target_config,
+    get_now,
+    save_to_csv,
+    save_to_csv_with_user_id_mapping,
+    logger,
+    source_user_id,
+    target_user_id,
+    check_db_connection,
+    execute_sql,
 )
 
+script_name = "auto_month"
 
-# 載入 .env 檔案
-load_dotenv()
-
-logger = logging.getLogger()
-
-# 設定日誌層級，預設為 INFO
-log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
-logger.setLevel(getattr(logging, log_level, logging.INFO))
-
-handler = logging.StreamHandler(sys.stdout)
-
-handler.setFormatter(CustomFormatter())
-
-logger.addHandler(handler)
-
-
-# 來源資料庫連線資訊
-source_config = {
-    'host': os.getenv('SOURCE_DB_HOST'),
-    'user': os.getenv('SOURCE_DB_USER'),
-    'password': os.getenv('SOURCE_DB_PASSWORD'),
-    'database': os.getenv('SOURCE_DB_NAME'),
-    'charset': 'utf8mb4'
-}
-
-source_user_id = os.getenv('SOURCE_DB_USER_ID')
-
-
-# 目標資料庫連線資訊
-target_config = {
-    'host': os.getenv('TARGET_DB_HOST'),
-    'user': os.getenv('TARGET_DB_USER'),
-    'password': os.getenv('TARGET_DB_PASSWORD'),
-    'database': os.getenv('TARGET_DB_NAME'),
-    'charset': 'utf8mb4'
-}
-
-# 目前還沒用到
-target_user_id = os.getenv('TARGET_DB_USER_ID')
-
-
-
-def get_now():
+def insert_data_by_delete_month(table_name, columns, rows):
     """
-    取得當前時間，若有設定環境變數 TEST_DATE 則使用該時間
-    TEST_DATE 格式: YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS
+    將資料寫入目標資料庫 (需要 DELETE 資料表重算)
     """
-    test_date = os.getenv('TEST_DATE')
-    if test_date:
-        try:
-            # 嘗試解析包含時間的格式
-            return datetime.strptime(test_date, "%Y-%m-%d %H:%M:%S")
-        except ValueError:
-            try:
-                # 嘗試解析只包含日期的格式
-                return datetime.strptime(test_date, "%Y-%m-%d")
-            except ValueError:
-                logger.warning(f"TEST_DATE 格式錯誤: {test_date}，將使用系統時間。")
-    return datetime.now()
-
-
-def check_db_connection():
-    """
-    檢查資料庫連線
-    """
-    try:
-        conn = pymysql.connect(**source_config)
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT VERSION()")
-            version = cursor.fetchone()
-
-            # log 要記錄今天執行是日期
-            today_str = get_now().strftime("%Y-%m-%d")
-            logger.debug(f"========================================================")
-            logger.debug(f"執行日期: {today_str}")    
-            logger.debug(f"執行腳本: auto_month.py")    
-            logger.debug(f"========================================================")
-            logger.debug(f"來源資料庫: {source_config['host']} 資料庫連線成功！版本: {version[0]}")
-            logger.debug(f"目標資料庫: {target_config['host']}")
-            logger.debug(f"========================================================")
-        conn.close()
-        return True
-    except Exception as e:
-        logger.error(f"{source_config['host']} 資料庫連線失敗: {e}")
-        return False
-
-
-
-def fetch_data(select_sql):
-    conn = pymysql.connect(**source_config)
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute(select_sql)
-            columns = [desc[0] for desc in cursor.description]
-            results = cursor.fetchall()
-            return columns, results
-    finally:
-        conn.close()
-
-
-def insert_data(table_name, columns, rows):
+    
     # 檢查是否有 user_id 欄位，若有則進行轉換
     if 'user_id' in columns:
         user_id_idx = columns.index('user_id')
@@ -177,38 +90,8 @@ def insert_data(table_name, columns, rows):
         conn.close()
 
 
-def save_to_csv(columns, data, filename="output.csv"):
-    """將資料寫入 CSV 檔案"""
-    try:
-        # 使用 utf-8-sig 編碼以支援 Excel 開啟中文
-        with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
-            writer = csv.writer(f)
-            writer.writerow(columns)
-            writer.writerows(data)
-        logger.debug(f"資料已成功寫入 {filename} 共 {len(data)} 筆資料至 csv 檔")
-    except Exception as e:
-        logger.error(f"寫入 CSV 失敗: {e}")
-
-
-def execute_sql(sql):
-    """
-    執行 SQL 指令 (針對目標資料庫)
-    """
-    conn = pymysql.connect(**target_config)
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute(sql)
-        conn.commit()
-        logger.debug(f"目標資料庫: {target_config['host']}，SQL 指令執行成功")
-    except Exception as e:
-        logger.error(f"目標資料庫: {target_config['host']}，SQL 指令執行失敗: {e}")
-        raise e
-    finally:
-        conn.close()
-
-
 if __name__ == "__main__":
-    if check_db_connection():
+    if check_db_connection(script_name):
         table_names = []
         table_select_sqls = []
 
@@ -273,11 +156,11 @@ if __name__ == "__main__":
 
                 logger.info(f"來源資料庫: {source_config['host']}，正在執行查詢: {select_sql}")
 
-                columns, data = fetch_data(select_sql)
+                columns, data = fetch_data(source_config, select_sql)
                 if data:
                     save_to_csv(columns, data, f"{dirs}/{table_name}.csv")
                     # 同步寫入目標資料庫
-                    insert_data(f"{table_name}", columns, data)
+                    insert_data_by_delete_month(f"{table_name}", columns, data)
                 else:
                     logger.warning(f"來源資料庫: {source_config['host']}，資料表 {table_name} 無資料")
             except Exception as e:
