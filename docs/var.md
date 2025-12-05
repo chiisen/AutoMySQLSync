@@ -58,6 +58,40 @@ current_day_sun = current_day_mon + 2
 current_day_sun = (current_day_mon + 1) % 7 + 1
 ```
 
+# 轉文字陣列索引
+```python
+def day_sun_to_week_index(day_index_sun):
+    """
+    將日曆的 day_sun 轉換為週的 ["Mon":0, "Tue":1, "Wed":2, "Thu":3, "Fri":4, "Sat":5, "Sun":6] 的索引
+    """
+    mapping_sun_to_week = {
+                1:6,
+                2:0,
+                3:1,
+                4:2, 
+                5:3,
+                6:4,
+                7:5
+                }
+    return mapping_sun_to_week[day_index_sun]
+
+def day_mon_to_week_index(day_index_mon):
+    """
+    將日曆的 day_mon 轉換為週的 ["Mon":0, "Tue":1, "Wed":2, "Thu":3, "Fri":4, "Sat":5, "Sun":6] 的索引
+    """
+    mapping_mon_to_week = {
+                0:0,
+                1:1,
+                2:2,
+                3:3, 
+                4:4,
+                5:5,
+                6:6
+                }
+    return mapping_mon_to_week[day_index_mon]
+```
+
+
 # ##WEEK_SUN##
 | 日期     | 值        | 星期幾   | week_sun |
 | -------- | -------- | -------- | -------- |
