@@ -240,6 +240,39 @@ def check_db_connection(script_name):
         return False
 
 
+def delete_day_data(table_name, current_year, today_str, current_week_mon, current_week_sun, current_day_mon, current_day_sun):
+    """
+    刪除 day 資料 (針對目標資料庫)
+    """
+    sql = ""
+    sql_online = ""
+    if table_name == "activity_day":
+        sql = f"DELETE FROM activity_day WHERE year_num = {current_year} AND start_time >= '{today_str}T00:00:00.000+08:00' AND start_time <= '{today_str}T23:59:59.999+08:00';"
+        sql_online = f"DELETE FROM activity_day_online WHERE year_num = {current_year} AND start_time >= '{today_str}T00:00:00.000+08:00' AND start_time <= '{today_str}T23:59:59.999+08:00';"
+    elif table_name == "activity_day_of_first_monday":
+        sql = f"DELETE FROM activity_day_of_first_monday WHERE year_num = {current_year} AND start_time >= '{today_str}T00:00:00.000+08:00' AND start_time <= '{today_str}T23:59:59.999+08:00';"
+        sql_online = f"DELETE FROM activity_day_of_first_monday_online WHERE year_num = {current_year} AND start_time >= '{today_str}T00:00:00.000+08:00' AND start_time <= '{today_str}T23:59:59.999+08:00';"
+    elif table_name == "activity_day_weight_training":
+        sql = f"DELETE FROM activity_day_weight_training WHERE year_num = {current_year} AND week_num = {current_week_sun} AND day_num = {current_day_sun};"
+        sql_online = f"DELETE FROM activity_day_weight_training_online WHERE year_num = {current_year} AND week_num = {current_week_sun} AND day_num = {current_day_sun};"
+    elif table_name == "activity_day_weight_training_of_first_monday":
+        sql = f"DELETE FROM activity_day_weight_training_of_first_monday WHERE year_num = {current_year} AND week_num = {current_week_mon} AND day_num = {current_day_mon};"
+        sql_online = f"DELETE FROM activity_day_weight_training_of_first_monday_online WHERE year_num = {current_year} AND week_num = {current_week_mon} AND day_num = {current_day_mon};"
+
+    conn = pymysql.connect(**target_config)
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(sql)
+            cursor.execute(sql_online)
+        conn.commit()
+        logger.debug(f"目標資料庫: {target_config['host']}，{table_name} SQL 指令執行成功")
+    except Exception as e:
+        logger.error(f"目標資料庫: {target_config['host']}，{table_name} SQL 指令執行失敗: {e}")
+        raise e
+    finally:
+        conn.close()
+
+
 def execute_sql(sql):
     """
     執行 SQL 指令 (針對目標資料庫)

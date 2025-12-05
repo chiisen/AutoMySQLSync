@@ -20,6 +20,7 @@ from help import (
     insert_data,
     convert_user_id,
     compare_data,
+    delete_day_data,
 )
 
 script_name = "auto_day_fix"
@@ -44,6 +45,8 @@ if __name__ == "__main__":
         dirs = "./output/day_fix"
         os.makedirs(dirs, exist_ok=True)
 
+        # 檢查是否有差異
+        is_diff = []
         for table_name in table_names:
             try:
                 logger.info(f"正在處理資料表: {table_name}")
@@ -117,8 +120,15 @@ if __name__ == "__main__":
                     if diff_data:
                         logger.warning(f"資料表 {table_name} 有差異，正在寫入差異資料到 CSV 檔案")
                         save_to_csv(target_columns, diff_data, f"{dirs}/{table_name}_diff.csv")
+
+                        # 有差異
+                        is_diff.append(table_name)
+
+                        # 刪除目標的原始資料
+                        delete_day_data(f"{table_name}", current_year, today_str, current_week_mon, current_week_sun, current_day_mon, current_day_sun)
+
                         # 同步寫入目標資料庫
-                        insert_data(f"{table_name}", target_columns, diff_data)
+                        insert_data(f"{table_name}", target_columns, source_data_with_user_id_mapping)
                     else:
                         logger.info(f"資料表 {table_name} 無差異")  
                 
@@ -166,7 +176,11 @@ if __name__ == "__main__":
                     logger.info(f"來源資料庫: {target_config['host']}，正在執行統計 SQL 指令: {sql_file}")
 
                     # 執行 SQL 指令
-                    ############## execute_sql(sql)
+                    if is_diff:
+                        # 判斷 is_diff 之中是否包含 sql_file
+                        for sql_file in is_diff:
+                            logger.info(f"來源資料庫: {target_config['host']}，正在執行統計 SQL 指令: {sql_file}")
+                            execute_sql(sql)
             except Exception as e:
                 logger.error(f"執行 SQL 指令 {sql_file} 時發生錯誤: {e}")
     else:
